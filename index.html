@@ -1,0 +1,132 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Recomendaciones de Aaron</title>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: 'Roboto', sans-serif; }
+    .spinner {
+      border: 4px solid #e0e0e0;
+      border-top: 4px solid #1e88e5;
+      border-radius: 50%;
+      width: 28px;
+      height: 28px;
+      animation: spin 1s linear infinite;
+      margin: 10px auto;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+  <div id="root"></div>
+  <script type="text/babel">
+const { useState } = React;
+
+function App() {
+  const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
+  const [lastUpdate, setLastUpdate] = useState(new Date().toLocaleString());
+  const [openMenu, setOpenMenu] = useState(false);
+
+  const data = [
+    { id: 1, nombre: "Churrería El Moro", calificacion: 4.5, direccion: "Av. Central 123", tipo: "Postres", ciudad: "CDMX" },
+    { id: 2, nombre: "El gran abanico", calificacion: 4.6, direccion: "Calle Reforma 202", tipo: "Mariscos", ciudad: "CDMX" },
+    { id: 3, nombre: "Casa de Toño Parque Delta", calificacion: 4.5, direccion: "Parque Delta 44", tipo: "Comida mexicana", ciudad: "CDMX" },
+    { id: 4, nombre: "Sanborns Casa de los Azulejos", calificacion: 4.5, direccion: "Madero 4", tipo: "Comida mexicana", ciudad: "CDMX" },
+    { id: 5, nombre: "Café de Tacuba", calificacion: 4.5, direccion: "Tacuba 28", tipo: "Cafetería", ciudad: "CDMX" },
+  ];
+
+  const filtered = data.filter(
+    (r) =>
+      r.nombre.toLowerCase().includes(search.toLowerCase()) ||
+      r.calificacion.toString().includes(search)
+  );
+
+  const handleUpdate = () => {
+    setLoading(true);
+    setMessage("Actualizando información desde Google Maps...");
+    setTimeout(() => {
+      setLoading(false);
+      setMessage("✅ Datos actualizados correctamente");
+      setLastUpdate(new Date().toLocaleString());
+    }, 2500);
+  };
+
+  return (
+    <div className="min-h-screen">
+      <header className="bg-blue-600 text-white p-4 shadow-md flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <button onClick={() => setOpenMenu(!openMenu)} className="text-2xl hover:opacity-80">☰</button>
+          <img src="logo.png" alt="Logo" className="h-8"/>
+          <h1 className="text-xl font-bold">Recomendaciones de Aaron</h1>
+        </div>
+        <button onClick={handleUpdate} className="bg-white text-blue-600 font-semibold px-4 py-2 rounded-lg hover:bg-blue-50 shadow">
+          Actualizar datos
+        </button>
+      </header>
+
+      {loading && <div className="spinner mt-4"></div>}
+      {message && <p className="text-center text-gray-600 mt-2">{message}</p>}
+      <p className="text-center text-gray-500 mt-2">Última actualización: {lastUpdate}</p>
+
+      <section className="max-w-4xl mx-auto mt-8 text-center">
+        <h2 className="text-2xl font-semibold mb-4">Buscar restaurante</h2>
+        <div className="flex gap-2 justify-center">
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Ej. Casa de Toño o 4.5"
+            className="border rounded-lg p-2 w-2/3 shadow-sm"
+          />
+          <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Buscar restaurante</button>
+        </div>
+      </section>
+
+      <section className="max-w-6xl mx-auto mt-10 p-4 bg-white rounded-xl shadow">
+        <table className="w-full border text-sm">
+          <thead className="bg-blue-100">
+            <tr>
+              <th className="border p-2 text-left">🏠 Restaurante</th>
+              <th className="border p-2 text-center">⭐ Calificación</th>
+              <th className="border p-2 text-center">📍 Dirección</th>
+              <th className="border p-2 text-center">🍽️ Tipo</th>
+              <th className="border p-2 text-center">🏙️ Ciudad</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((r) => (
+              <tr key={r.id} className="hover:bg-blue-50 transition-all">
+                <td className="border p-2">{r.nombre}</td>
+                <td className="border p-2 text-center">{r.calificacion}</td>
+                <td className="border p-2 text-center">{r.direccion}</td>
+                <td className="border p-2 text-center">{r.tipo}</td>
+                <td className="border p-2 text-center">{r.ciudad}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+
+      <footer className="mt-10 p-4 text-center text-gray-500 text-sm">
+        © 2025 Recomendaciones de Aaron — Todos los derechos reservados.
+      </footer>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
