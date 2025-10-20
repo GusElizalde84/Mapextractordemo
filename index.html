@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Recomendaciones de Aaron</title>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: 'Roboto', sans-serif; }
+    .spinner { border: 4px solid #e0e0e0; border-top: 4px solid #1e88e5; border-radius: 50%; width: 28px; height: 28px; animation: spin 1s linear infinite; margin: 10px auto; }
+    @keyframes spin { 0% {transform: rotate(0deg);} 100% {transform: rotate(360deg);} }
+    .menu-panel { transform: translateX(-100%); transition: transform .3s ease; }
+    .menu-panel.open { transform: translateX(0); }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    function App() {
+      const [search, setSearch] = useState("");
+      const [loading, setLoading] = useState(false);
+      const [message, setMessage] = useState("");
+      const [lastUpdate, setLastUpdate] = useState(new Date().toLocaleString());
+      const [openMenu, setOpenMenu] = useState(false);
+      const [rows, setRows] = useState([
+        { id: 1,  nombre: "Churrería El Moro", calificacion: 4.5, reseñas: 33944, direccion: "Eje Central Lázaro Cárdenas 42", tipo: "Postres", ciudad: "CDMX" },
+        { id: 2,  nombre: "El Gran Abanico", calificacion: 4.6, reseñas: 27803, direccion: "Bolívar 55, Centro", tipo: "Mariscos", ciudad: "CDMX" },
+        { id: 3,  nombre: "Casa de Toño Parque Delta", calificacion: 4.5, reseñas: 23130, direccion: "Av. Cuauhtémoc 462", tipo: "Comida mexicana", ciudad: "CDMX" },
+        { id: 4,  nombre: "Sanborns Casa de los Azulejos", calificacion: 4.5, reseñas: 20992, direccion: "Madero 4, Centro", tipo: "Comida mexicana", ciudad: "CDMX" },
+        { id: 5,  nombre: "Casa de Toño Juárez", calificacion: 4.5, reseñas: 20849, direccion: "Av. Juárez 24", tipo: "Comida mexicana", ciudad: "CDMX" },
+        { id: 6,  nombre: "Café de Tacuba", calificacion: 4.5, reseñas: 16111, direccion: "Tacuba 28, Centro", tipo: "Cafetería", ciudad: "CDMX" },
+        { id: 7,  nombre: "Taquerías el Fogón Gustavo Baz", calificacion: 4.5, reseñas: 14860, direccion: "Blvd. Gustavo Baz 112", tipo: "Tacos", ciudad: "CDMX" },
+        { id: 8,  nombre: "Perro Negro Centro", calificacion: 4.5, reseñas: 14083, direccion: "Rep. de Uruguay 13", tipo: "Pizzería", ciudad: "CDMX" },
+        { id: 9,  nombre: "Casa de Toño Azcapotzalco", calificacion: 4.5, reseñas: 13685, direccion: "Av. Azcapotzalco 200", tipo: "Comida mexicana", ciudad: "CDMX" },
+        { id: 10, nombre: "Michoacaníssimo", calificacion: 4.5, reseñas: 13455, direccion: "División del Norte 2500", tipo: "Comida mexicana", ciudad: "CDMX" },
+        { id: 11, nombre: "El Cardenal Centro", calificacion: 4.6, reseñas: 19870, direccion: "Palma 23, Centro", tipo: "Comida mexicana", ciudad: "CDMX" },
+        { id: 12, nombre: "Azul Histórico", calificacion: 4.5, reseñas: 17650, direccion: "Isabel la Católica 30", tipo: "Comida mexicana", ciudad: "CDMX" },
+        { id: 13, nombre: "Taquería Orinoco Roma", calificacion: 4.6, reseñas: 15420, direccion: "Insurgentes 253, Roma", tipo: "Tacos", ciudad: "CDMX" },
+        { id: 14, nombre: "El Huequito Centro", calificacion: 4.5, reseñas: 14390, direccion: "Ayuntamiento 21", tipo: "Tacos", ciudad: "CDMX" },
+        { id: 15, nombre: "Pujol (Barra de tacos)", calificacion: 4.6, reseñas: 12540, direccion: "Tennyson 133, Polanco", tipo: "Alta cocina", ciudad: "CDMX" },
+        { id: 16, nombre: "Fonda Margarita", calificacion: 4.4, reseñas: 11810, direccion: "Adolfo Prieto 1364, Del Valle", tipo: "Desayunos", ciudad: "CDMX" },
+        { id: 17, nombre: "Rosetta Panadería", calificacion: 4.6, reseñas: 16780, direccion: "Colima 179, Roma", tipo: "Panadería", ciudad: "CDMX" },
+        { id: 18, nombre: "Lalo!", calificacion: 4.5, reseñas: 13890, direccion: "Zacatecas 173, Roma", tipo: "Bistró", ciudad: "CDMX" },
+        { id: 19, nombre: "Contramar", calificacion: 4.6, reseñas: 18950, direccion: "Durango 200, Roma", tipo: "Mariscos", ciudad: "CDMX" },
+        { id: 20, nombre: "Pasillo de Humo", calificacion: 4.5, reseñas: 12110, direccion: "Av. Universidad 200, Coyoacán", tipo: "Oaxaqueña", ciudad: "CDMX" },
+      ]);
+
+      const [clientQuery, setClientQuery] = useState("");
+
+      useEffect(() => {
+        document.body.style.overflow = openMenu ? "hidden" : "auto";
+        return () => { document.body.style.overflow = "auto"; };
+      }, [openMenu]);
+
+      const formatMiles = (n) => n.toLocaleString('es-MX');
+
+      const filtered = rows.filter((r) =>
+        r.nombre.toLowerCase().includes(search.toLowerCase()) ||
+        (r.calificacion + "").includes(search.trim())
+      );
+
+      const fetchPlaces = async (q) => {
+        try {
+          setLoading(true);
+          setMessage("Actualizando información desde Google Maps...");
+          const resp = await fetch(`/api/lugares?q=${encodeURIComponent(q)}`);
+          const json = await resp.json();
+          const mapped = (json.results || []).slice(0, 20).map((p, idx) => ({
+            id: idx + 1,
+            nombre: p.name || "Sin nombre",
+            calificacion: p.rating ?? "-",
+            reseñas: p.user_ratings_total ?? 0,
+            direccion: p.formatted_address || p.vicinity || "—",
+            tipo: (p.types && p.types[0]) ? p.types[0].replace(/_/g, " ") : "—",
+            ciudad: "CDMX",
+          }));
+          if (mapped.length) setRows(mapped);
+          setMessage("✅ Datos actualizados correctamente");
+          setLastUpdate(new Date().toLocaleString());
+        } catch (e) {
+          setMessage("Error al consultar la API. Revisa la API Key o el límite de uso.");
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      return (
+        <div className="min-h-screen">
+          <header className="bg-blue-600 text-white px-4 py-3 shadow-md flex items-center gap-3">
+            <button onClick={() => setOpenMenu(true)} className="text-2xl hover:opacity-80" aria-label="Abrir menú">☰</button>
+            <img src="logo.png" alt="Logo" style="height: 2.25rem; width: auto;" />
+            <h1 className="text-xl font-bold">Recomendaciones de Aaron</h1>
+          </header>
+
+          {openMenu && <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setOpenMenu(false)}></div>}
+          <aside className={"fixed top-0 left-0 z-50 bg-white w-64 h-full shadow-xl menu-panel " + (openMenu ? "open" : "")}>
+            <div className="p-4 border-b flex items-center justify-between">
+              <span className="font-semibold">Menú</span>
+              <button onClick={() => setOpenMenu(false)} className="text-lg" aria-label="Cerrar">✕</button>
+            </div>
+            <nav className="p-4 space-y-3 text-gray-700">
+              <div className="hover:underline cursor-pointer">🏠 Inicio</div>
+              <div className="hover:underline cursor-pointer">📊 Reportes</div>
+              <div className="hover:underline cursor-pointer">⚙️ Configuración</div>
+            </nav>
+          </aside>
+
+          <section className="max-w-5xl mx-auto mt-8 px-4 text-center">
+            <h2 className="text-2xl font-semibold mb-4">Buscar restaurante</h2>
+            <div className="flex gap-2 justify-center">
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e)=>{ if(e.key==='Enter'){ setClientQuery(search); fetchPlaces(search || 'restaurants in Mexico City'); } }}
+                placeholder="Ej. Casa de Toño o 'tacos en Roma Norte'"
+                className="border rounded-lg p-2 w-full max-w-xl shadow-sm"
+              />
+              <button
+                onClick={()=>{ setClientQuery(search); fetchPlaces(search || 'restaurants in Mexico City'); }}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+              >
+                Buscar restaurante
+              </button>
+            </div>
+          </section>
+
+          <section className="max-w-6xl mx-auto mt-8 px-4">
+            <div className="bg-white rounded-xl shadow overflow-hidden">
+              <div className="bg-blue-600 text-white px-4 py-3 font-semibold">RESTAURANTES</div>
+              <div className="p-4 overflow-x-auto">
+                <table className="min-w-full text-sm border">
+                  <thead className="bg-blue-100">
+                    <tr>
+                      <th className="border p-2 text-center">#</th>
+                      <th className="border p-2 text-left">🏠 Restaurante</th>
+                      <th className="border p-2 text-center">⭐ Calificación</th>
+                      <th className="border p-2 text-center">💬 Reseñas</th>
+                      <th className="border p-2 text-center">📍 Dirección</th>
+                      <th className="border p-2 text-center">🍽️ Tipo</th>
+                      <th className="border p-2 text-center">🏙️ Ciudad</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((r) => (
+                      <tr key={r.id} className="hover:bg-blue-50 transition-all">
+                        <td className="border p-2 text-center">{r.id}</td>
+                        <td className="border p-2">{r.nombre}</td>
+                        <td className="border p-2 text-center">{r.calificacion}</td>
+                        <td className="border p-2 text-center">{(r.reseñas||0).toLocaleString('es-MX')}</td>
+                        <td className="border p-2 text-center">{r.direccion}</td>
+                        <td className="border p-2 text-center">{r.tipo}</td>
+                        <td className="border p-2 text-center">{r.ciudad}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="flex flex-col items-center justify-center mt-6 mb-10">
+              <button
+                onClick={()=> fetchPlaces(clientQuery || 'restaurants in Mexico City')}
+                className="bg-blue-600 text-white font-semibold px-5 py-2 rounded-lg hover:bg-blue-700 shadow"
+              >
+                Actualizar datos
+              </button>
+              {loading && <div className="spinner mt-3" aria-label="Cargando"></div>}
+              {message && <p className="text-gray-600 mt-2">{message}</p>}
+              <p className="text-gray-500 text-sm mt-2">Última actualización: {lastUpdate}</p>
+            </div>
+          </section>
+
+          <footer className="mt-10 p-4 text-center text-gray-500 text-sm">© 2025 Recomendaciones de Aaron — Todos los derechos reservados.</footer>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
