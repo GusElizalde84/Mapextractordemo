@@ -1,0 +1,119 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Recomendaciones de Aaron</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+  <div id="root"></div>
+  <script type="text/babel">
+
+const { useState } = React;
+
+function App() {
+  const [search, setSearch] = useState("");
+  const [openMenu, setOpenMenu] = useState(false);
+  const [data] = useState([
+    { id: 1, nombre: "Churrería El Moro", resenas: 33944, promedio: 4.5 },
+    { id: 2, nombre: "El gran abanico", resenas: 27803, promedio: 4.6 },
+    { id: 3, nombre: "Casa de Toño Parque Delta", resenas: 23130, promedio: 4.5 },
+    { id: 4, nombre: "Sanborns Casa de los Azulejos", resenas: 20992, promedio: 4.5 },
+    { id: 5, nombre: "Casa de Toño Juárez", resenas: 20849, promedio: 4.5 },
+    { id: 6, nombre: "Café de Tacuba", resenas: 16111, promedio: 4.5 },
+    { id: 7, nombre: "Taquerías el Fogón Gustavo Baz", resenas: 14860, promedio: 4.5 },
+    { id: 8, nombre: "Perro Negro Centro", resenas: 14083, promedio: 4.5 },
+    { id: 9, nombre: "Casa de Toño Azcapotzalco", resenas: 13685, promedio: 4.5 },
+    { id: 10, nombre: "Michoacaníssimo", resenas: 13455, promedio: 4.5 }
+  ]);
+
+  const filtered = data.filter(
+    (r) =>
+      r.nombre.toLowerCase().includes(search.toLowerCase()) ||
+      r.promedio.toString().includes(search)
+  );
+
+  return (
+    <div>
+      {/* Header */}
+      <header className="bg-blue-600 text-white p-4 flex items-center justify-between shadow-md">
+        <div className="flex items-center gap-3">
+          <button onClick={() => setOpenMenu(!openMenu)} className="p-2 rounded hover:bg-blue-700">
+            ☰
+          </button>
+          <img src="logo.png" alt="Logo" className="h-8"/>
+          <h1 className="text-xl font-bold">Recomendaciones de Aaron</h1>
+        </div>
+      </header>
+
+      {/* Menú lateral */}
+      {openMenu && (
+        <aside className="fixed top-0 left-0 bg-white w-56 h-full shadow-lg p-4 z-50">
+          <button onClick={() => setOpenMenu(false)} className="mb-4 text-blue-600 font-semibold">✕ Cerrar</button>
+          <ul className="space-y-3 text-gray-700">
+            <li className="hover:underline cursor-pointer">🏠 Inicio</li>
+            <li className="hover:underline cursor-pointer">📊 Reportes</li>
+            <li className="hover:underline cursor-pointer">⚙️ Configuración</li>
+          </ul>
+        </aside>
+      )}
+
+      {/* Buscador */}
+      <section className="max-w-4xl mx-auto mt-10 text-center">
+        <h2 className="text-2xl font-semibold mb-4">Buscar restaurante</h2>
+        <div className="flex gap-2 justify-center">
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Ej. Casa de Toño o 4.5"
+            className="border rounded-lg p-2 w-2/3 shadow-sm"
+          />
+          <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Buscar restaurante</button>
+        </div>
+      </section>
+
+      {/* Tabla */}
+      <section className="max-w-5xl mx-auto mt-10 p-4 bg-white rounded-xl shadow">
+        <table className="w-full border text-sm">
+          <thead className="bg-gray-100">
+            <tr>
+              <th className="border p-2">#</th>
+              <th className="border p-2 text-left">Restaurante</th>
+              <th className="border p-2 text-center">Reseñas</th>
+              <th className="border p-2 text-center">Promedio ⭐</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((r) => (
+              <tr key={r.id} className="hover:bg-gray-50">
+                <td className="border p-2 text-center">{r.id}</td>
+                <td className="border p-2">{r.nombre}</td>
+                <td className="border p-2 text-center">{r.resenas.toLocaleString()}</td>
+                <td className="border p-2 text-center">{r.promedio}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p className="text-gray-500 text-sm mt-3">Última actualización: 20/10/2025</p>
+      </section>
+
+      <footer className="mt-10 p-4 text-center text-gray-500 text-sm">
+        © 2025 Recomendaciones de Aaron — Todos los derechos reservados.
+      </footer>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
