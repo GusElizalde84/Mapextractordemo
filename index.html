@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Recomendaciones de Aarón</title>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
+  <style>
+    body { font-family: 'Roboto', sans-serif; }
+    .spinner { border: 4px solid #e0e0e0; border-top: 4px solid #1e88e5; border-radius: 50%; width: 28px; height: 28px; animation: spin 1s linear infinite; margin: 10px auto; }
+    @keyframes spin { 0% {transform: rotate(0deg);} 100% {transform: rotate(360deg);} }
+    .menu-panel { transform: translateX(-100%); transition: transform .3s ease; }
+    .menu-panel.open { transform: translateX(0); }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo } = React;
+    const API_BASE = "https://aaronbestplaces.vercel.app/api/lugares";
+
+    const textos = {
+      es: {
+        title: "Recomendaciones de Aarón",
+        menu_home: "🏠 Inicio",
+        menu_reports: "📊 Reportes",
+        menu_help: "❓ Ayuda",
+        menu_access: "🌐 Accesibilidad",
+        menu_about: "ℹ️ Acerca de",
+        city: "Ciudad",
+        query: "Consulta",
+        minRating: "Calificación mínima ⭐",
+        all: "Todas",
+        search: "Buscar restaurante",
+        clear: "🧹 Limpiar búsqueda",
+        results: "RESULTADOS",
+        exportPDF: "📄 Exportar a PDF",
+        updating: "Actualizando información desde Google Maps...",
+        dataUpdated: "✅ Datos actualizados correctamente",
+        lastUpdate: "Última actualización",
+        noResults: "Sin resultados. Usa el buscador para traer datos de Google Maps.",
+        updateData: "Actualizar datos",
+        help_title: "Ayuda",
+        help_text: "Escribe el tipo o nombre del restaurante, selecciona una ciudad y, si lo deseas, una calificación mínima. Presiona “Buscar restaurante” para obtener resultados desde Google Maps, o “Actualizar datos” para refrescarlos. Para guardar los resultados, usa “Exportar a PDF”; se descargará un archivo con fecha y hora.",
+        close: "Cerrar",
+        about_title: "Acerca de",
+        about_line1: "Una aplicación para los mejores guías Edith y Aarón",
+        about_line2: "De sus amigos Lili y Gus",
+        reports_title: "Reportes",
+        reports_line1: "Próximamente habrá novedades en esta sección.",
+        reports_line2: "¡Estamos trabajando para ofrecerte reportes y estadísticas personalizadas!",
+        access_title: "Accesibilidad",
+        access_select: "Selecciona el idioma",
+        access_es: "Español",
+        access_en: "English",
+        footer_version: "Versión 41",
+        expanded_prefix: "🔍 Búsqueda ampliada:"
+      },
+      en: {
+        title: "Aaron’s Recommendations",
+        menu_home: "🏠 Home",
+        menu_reports: "📊 Reports",
+        menu_help: "❓ Help",
+        menu_access: "🌐 Accessibility",
+        menu_about: "ℹ️ About",
+        city: "City",
+        query: "Query",
+        minRating: "Minimum rating ⭐",
+        all: "All",
+        search: "Search restaurant",
+        clear: "🧹 Clear search",
+        results: "RESULTS",
+        exportPDF: "📄 Export to PDF",
+        updating: "Updating information from Google Maps...",
+        dataUpdated: "✅ Data updated successfully",
+        lastUpdate: "Last updated",
+        noResults: "No results. Use the search to fetch data from Google Maps.",
+        updateData: "Refresh data",
+        help_title: "Help",
+        help_text: "Type the restaurant name or type, select a city and an optional minimum rating. Click “Search restaurant” to get results from Google Maps, or “Refresh data” to update them. To save the results, use “Export to PDF”; a file with date and time will be downloaded.",
+        close: "Close",
+        about_title: "About",
+        about_line1: "An app for the best guides Edith and Aarón",
+        about_line2: "From their friends Lili and Gus",
+        reports_title: "Reports",
+        reports_line1: "New features are coming soon to this section.",
+        reports_line2: "We are working to offer you personalized reports and statistics!",
+        access_title: "Accessibility",
+        access_select: "Select language",
+        access_es: "Spanish",
+        access_en: "English",
+        footer_version: "Version 41",
+        expanded_prefix: "🔍 Expanded search:"
+      }
+    };
+
+    const equivalencias = {
+      "taqueria": ["tacos","taqueria","taquerías","taqueros"],
+      "pizzeria": ["pizza","pizzeria","pizzerias","pizzería","pizzerías"],
+      "hamburguesas": ["hamburguesas","burger","hamburguesería","hamburgueserias"],
+      "sushi": ["sushi","restaurante japonés","comida japonesa"],
+      "mariscos": ["mariscos","pescados","marisquería","marisquerías"],
+      "cafe": ["café","cafetería","coffee shop","cafe"],
+      "comida mexicana": ["comida mexicana","antojitos","tacos","cocina mexicana"],
+      "comida italiana": ["comida italiana","trattoria","pasta","pizza"],
+      "comida china": ["comida china","chow mein","arroz frito","dim sum"],
+      "comida americana": ["comida americana","hamburguesas","bbq","alitas"],
+      "postres": ["postres","repostería","pastelería"]
+    };
+
+    function normalize(s) {
+      return (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+    }
+
+    function expandQueryTerms(raw) {
+      const base = normalize(raw);
+      if (!base) return [];
+      const set = new Set([base]);
+      Object.keys(equivalencias).forEach(key => {
+        if (base.includes(key) || key.includes(base)) {
+          equivalencias[key].forEach(v => set.add(normalize(v)));
+        }
+      });
+      return Array.from(set);
+    }
+function App() {
+      const [lang, setLang] = useState("es");
+      const t = (k) => textos[lang][k] || k;
+
+      const [query, setQuery] = useState("");
+      const [city, setCity] = useState("Ciudad de México");
+      const [minRating, setMinRating] = useState("");
+      const [loading, setLoading] = useState(false);
+      const [message, setMessage] = useState("");
+      const [lastUpdate, setLastUpdate] = useState("");
+      const [openMenu, setOpenMenu] = useState(false);
+      const [openHelp, setOpenHelp] = useState(false);
+      const [openAbout, setOpenAbout] = useState(false);
+      const [openReports, setOpenReports] = useState(false);
+      const [openAccess, setOpenAccess] = useState(false);
+      const [rows, setRows] = useState([]);
+      const [expandedNotice, setExpandedNotice] = useState("");
+
+      useEffect(() => {
+        document.title = textos[lang].title;
+      }, [lang]);
+
+      useEffect(() => {
+        document.body.style.overflow = (openMenu || openHelp || openAbout || openReports || openAccess) ? "hidden" : "auto";
+        return () => { document.body.style.overflow = "auto"; };
+      }, [openMenu, openHelp, openAbout, openReports, openAccess]);
+
+      const formatMiles = (n) => (n ?? 0).toLocaleString(lang === "es" ? "es-MX" : "en-US");
+
+      async function fetchPlaces(q) {
+        setLoading(true);
+        setMessage(t("updating"));
+        try {
+          const baseFallback = lang === "es" ? "restaurantes" : "restaurants";
+          const terms = expandQueryTerms(q || baseFallback);
+          const visibleTerms = terms.filter(Boolean).slice(0, 8);
+
+          if (visibleTerms.length > 1) {
+            setExpandedNotice(`${t("expanded_prefix")} ${visibleTerms.join(", ")}`);
+            setTimeout(() => setExpandedNotice(""), 3000);
+          } else {
+            setExpandedNotice("");
+          }
+
+          const finalQuery = (terms.length ? terms.join(" OR ") : (q || baseFallback)) + " en " + city;
+          const res = await fetch(API_BASE + "?q=" + encodeURIComponent(finalQuery));
+          const json = await res.json();
+
+          const data = (json.results || [])
+            .map((p, i) => ({
+              id: i + 1,
+              nombre: p.name || "-",
+              calificacion: p.rating ?? "-",
+              reseñas: p.user_ratings_total ?? 0,
+              direccion: p.formatted_address || p.vicinity || "-",
+              lugarId: p.place_id || null,
+            }))
+            .sort((a, b) => (Number(b.calificacion) || 0) - (Number(a.calificacion) || 0));
+
+          setRows(data);
+          setMessage(t("dataUpdated"));
+          const now = new Date();
+          const fecha = now.toLocaleDateString(lang === "es" ? "es-MX" : "en-US");
+          const hora = now.toLocaleTimeString(lang === "es" ? "es-MX" : "en-US", { hour: '2-digit', minute: '2-digit' });
+          setLastUpdate(`${fecha} ${hora}`);
+        } catch (e) {
+          console.error(e);
+          setMessage(lang === "es" ? "Error al consultar la API. Revisa la API Key o los límites de uso." : "API error. Check API key or usage limits.");
+        } finally {
+          setLoading(false);
+        }
+      }
+
+      const filtered = useMemo(() => {
+        const qn = normalize(query);
+        return rows.filter((r) => {
+          const name = normalize(r.nombre || "");
+          const addr = normalize(r.direccion || "");
+          const passName = qn ? (name.includes(qn) || addr.includes(qn)) : true;
+          const passRating = minRating ? (Number(r.calificacion) >= Number(minRating)) : true;
+          return passName && passRating;
+        });
+      }, [rows, query, minRating]);
+
+      const exportPDF = () => {
+        const el = document.getElementById("results-section");
+        const now = new Date();
+        const fecha = now.toLocaleDateString(lang === "es" ? "es-MX" : "en-US");
+        const hora = now.toLocaleTimeString(lang === "es" ? "es-MX" : "en-US", { hour: '2-digit', minute: '2-digit' }).replace(':','-');
+        html2pdf().set({
+          margin: 10,
+          filename: `reporte_recomendaciones_${fecha}_${hora}.pdf`,
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2 },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        }).from(el).save();
+      };
+
+      const resetHome = () => {
+        setOpenMenu(false);
+        setQuery("");
+        setCity("Ciudad de México");
+        setMinRating("");
+        setRows([]);
+        setMessage("");
+        setExpandedNotice("");
+        setLastUpdate("");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      };
+
+      return (
+        <div className="min-h-screen">
+          <header className="bg-blue-600 text-white px-4 py-3 shadow-md flex items-center gap-3">
+            <button onClick={() => setOpenMenu(true)} className="text-2xl hover:opacity-80" aria-label="Abrir menú">☰</button>
+            <img src="logo.png" alt="Logo" className="h-12 w-auto" />
+            <h1 className="text-xl font-bold">{t("title")}</h1>
+          </header>
+
+          {openMenu && <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setOpenMenu(false)}></div>}
+          <aside className={"fixed top-0 left-0 z-50 bg-white w-64 h-full shadow-xl menu-panel " + (openMenu ? "open" : "")}>
+            <div className="p-4 border-b flex items-center justify-between">
+              <span className="font-semibold">Menú</span>
+              <button onClick={() => setOpenMenu(false)} className="text-lg" aria-label="Cerrar">✕</button>
+            </div>
+            <nav className="p-4 space-y-3 text-gray-700">
+              <div className="hover:underline cursor-pointer" onClick={resetHome}>{t("menu_home")}</div>
+              <div className="hover:underline cursor-pointer" onClick={() => {setOpenReports(true); setOpenMenu(false);}}>{t("menu_reports")}</div>
+              <div className="hover:underline cursor-pointer" onClick={() => {setOpenHelp(true); setOpenMenu(false);}}>{t("menu_help")}</div>
+              <div className="hover:underline cursor-pointer" onClick={() => {setOpenAccess(true); setOpenMenu(false);}}>{t("menu_access")}</div>
+              <div className="hover:underline cursor-pointer" onClick={() => {setOpenAbout(true); setOpenMenu(false);}}>{t("menu_about")}</div>
+            </nav>
+          </aside>
+
+          {openHelp && (
+            <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+              <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 text-center">
+                <h2 className="text-xl font-semibold mb-3 text-blue-600">{t("help_title")}</h2>
+                <p className="text-sm text-gray-700 mb-4">{t("help_text")}</p>
+                <button onClick={() => setOpenHelp(false)} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">{t("close")}</button>
+              </div>
+            </div>
+          )}
+
+          {openAbout && (
+            <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+              <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 text-center">
+                <h2 className="text-xl font-semibold mb-3 text-blue-600">{t("about_title")}</h2>
+                <p className="text-gray-700 mb-4">
+                  {t("about_line1")}<br/>{t("about_line2")}
+                </p>
+                <button onClick={() => setOpenAbout(false)} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">{t("close")}</button>
+              </div>
+            </div>
+          )}
+
+          {openReports && (
+            <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+              <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 text-center">
+                <h2 className="text-xl font-semibold mb-3 text-blue-600">{t("reports_title")}</h2>
+                <p className="text-gray-700 mb-1">{t("reports_line1")}</p>
+                <p className="text-gray-700 mb-4">{t("reports_line2")}</p>
+                <button onClick={() => setOpenReports(false)} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">{t("close")}</button>
+              </div>
+            </div>
+          )}
+
+          {openAccess && (
+            <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+              <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 text-center">
+                <h2 className="text-xl font-semibold mb-3 text-blue-600">{t("access_title")}</h2>
+                <p className="text-sm text-gray-700 mb-4">{t("access_select")}</p>
+                <div className="flex items-center justify-center gap-4 mb-4">
+                  <label className="inline-flex items-center gap-2">
+                    <input type="radio" name="lang" checked={lang === "es"} onChange={() => setLang("es")} />
+                    <span>{textos["es"].access_es}</span>
+                  </label>
+                  <label className="inline-flex items-center gap-2">
+                    <input type="radio" name="lang" checked={lang === "en"} onChange={() => setLang("en")} />
+                    <span>{textos["en"].access_en}</span>
+                  </label>
+                </div>
+                <button onClick={() => setOpenAccess(false)} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">{t("close")}</button>
+              </div>
+            </div>
+          )}
+
+          <section className="max-w-6xl mx-auto mt-6 px-4">
+            <div className="bg-white rounded-xl shadow p-4 flex flex-col md:flex-row gap-3 items-center justify-between">
+              <div className="w-full md:w-1/4">
+                <label className="block text-sm text-gray-600 mb-1">{t("city")}</label>
+                <select value={city} onChange={(e)=>setCity(e.target.value)} className="border rounded-lg p-2 w-full shadow-sm">
+                  <option>Ciudad de México</option>
+                  <option>Guadalajara</option>
+                  <option>Monterrey</option>
+                </select>
+              </div>
+              <div className="flex-1 w-full">
+                <label className="block text-sm text-gray-600 mb-1">{t("query")}</label>
+                <input
+                  type="text"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") fetchPlaces(query); }}
+                  placeholder={lang === "es" ? "Ej. 'taquerías', 'pizzerías', etc." : "e.g. 'tacos', 'pizza', etc."}
+                  className="border rounded-lg p-2 w-full shadow-sm"
+                />
+              </div>
+              <div className="w-full md:w-56">
+                <label className="block text-sm text-gray-600 mb-1">{t("minRating")}</label>
+                <select value={minRating} onChange={(e)=>setMinRating(e.target.value)} className="border rounded-lg p-2 w-full shadow-sm">
+                  <option value="">{t("all")}</option>
+                  <option value="4.0">4.0+</option>
+                  <option value="4.2">4.2+</option>
+                  <option value="4.4">4.4+</option>
+                  <option value="4.6">4.6+</option>
+                  <option value="4.8">4.8+</option>
+                </select>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => fetchPlaces(query)} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+                  {t("search")}
+                </button>
+                <button onClick={() => setQuery("")} className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100">
+                  {t("clear")}
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <section id="results-section" className="max-w-6xl mx-auto mt-6 px-4">
+            <div className="bg-white rounded-xl shadow overflow-hidden">
+              <div className="bg-blue-600 text-white px-4 py-3 font-semibold flex justify-between items-center">
+                <span>{t("results")}</span>
+                <button onClick={exportPDF} className="bg-white text-blue-700 font-semibold px-3 py-1 rounded hover:bg-blue-50 text-sm">{t("exportPDF")}</button>
+              </div>
+              {expandedNotice && (
+                <div className="px-4 py-2 bg-blue-100 text-blue-800 border-t border-b border-blue-200 text-sm">
+                  {expandedNotice}
+                </div>
+              )}
+              <div className="p-4 overflow-x-auto">
+                <table className="min-w-full text-sm border">
+                  <thead className="bg-blue-100">
+                    <tr>
+                      <th className="border p-2 text-center">#</th>
+                      <th className="border p-2 text-left">🏠 {lang === "es" ? "Restaurante" : "Restaurant"}</th>
+                      <th className="border p-2 text-center">⭐ {lang === "es" ? "Calificación" : "Rating"}</th>
+                      <th className="border p-2 text-center">💬 {lang === "es" ? "Reseñas" : "Reviews"}</th>
+                      <th className="border p-2 text-left">📍 {lang === "es" ? "Dirección" : "Address"}</th>
+                      <th className="border p-2 text-center">🔗 {lang === "es" ? "Ver mapa" : "Open map"}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filtered.map((r, idx) => (
+                      <tr key={idx} className="hover:bg-blue-50 transition-all">
+                        <td className="border p-2 text-center">{idx + 1}</td>
+                        <td className="border p-2">{r.nombre}</td>
+                        <td className="border p-2 text-center">{r.calificacion}</td>
+                        <td className="border p-2 text-center">{formatMiles(r.reseñas)}</td>
+                        <td className="border p-2">{r.direccion}</td>
+                        <td className="border p-2 text-center">
+                          <a href={"https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent((r.nombre||"") + " " + (r.direccion||""))}
+                             target="_blank" rel="noopener noreferrer"
+                             className="text-blue-600 hover:underline">
+                             {lang === "es" ? "Abrir" : "Open"}
+                          </a>
+                        </td>
+                      </tr>
+                    ))}
+                    {filtered.length === 0 && (
+                      <tr>
+                        <td colSpan="6" className="text-center text-gray-500 p-6">{t("noResults")}</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="flex flex-col items-center justify-center mt-6 mb-10">
+              <button
+                onClick={()=> fetchPlaces(query)}
+                className="bg-blue-600 text-white font-semibold px-5 py-2 rounded-lg hover:bg-blue-700 shadow"
+              >
+                {t("updateData")}
+              </button>
+              {loading && <div className="spinner mt-3" aria-label="Cargando"></div>}
+              {message && (
+                <>
+                  <p className="text-gray-700 mt-2">{message}</p>
+                  {lastUpdate && message === t("dataUpdated") && (
+                    <p className="text-gray-500 text-sm mt-1">{t("lastUpdate")}: {lastUpdate}</p>
+                  )}
+                </>
+              )}
+            </div>
+          </section>
+
+          <footer className="mt-10 p-4 text-center text-gray-500 text-sm flex flex-col md:flex-row justify-between items-center border-t border-gray-200">
+            <span>© 2025 {t("title")} — {lang === "es" ? "Todos los derechos reservados." : "All rights reserved."}</span>
+            <span className="text-right font-semibold text-gray-600">{textos[lang].footer_version}</span>
+          </footer>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
