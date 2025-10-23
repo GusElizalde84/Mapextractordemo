@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Recomendaciones de Aarón</title>
+
+  <!-- Tailwind (dark mode por clase) -->
+  <script>tailwind = { config: { darkMode: 'class' } };</script>
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- React 18 + Babel + html2pdf (orden correcto) -->
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
+
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+
+  <style>
+    body { font-family: 'Roboto', sans-serif; }
+    .menu-panel { transform: translateX(-100%); transition: transform .3s ease; }
+    .menu-panel.open { transform: translateX(0); }
+
+    /* 🌙 Modo oscuro con contraste alto */
+    .dark { background-color: #000 !important; color: #fff !important; }
+    .dark .bg-white { background-color: #111 !important; }
+    .dark input, .dark select, .dark textarea { background-color: #222 !important; color: #fff !important; border-color: #444 !important; }
+    .dark input::placeholder { color: #bbb !important; }
+    .dark table { background-color: #000 !important; }
+    .dark table th { background-color: #1a1a1a !important; color: #fff !important; border-color: #333 !important; }
+    .dark table td { background-color: #0d0d0d !important; color: #f2f2f2 !important; border-color: #333 !important; }
+    .dark .bg-blue-600 { background-color: #2563eb !important; color: #fff !important; }
+    .dark .hover\:bg-blue-700:hover { background-color: #1e4ed8 !important; }
+    .dark .text-blue-600 { color: #5ea0ff !important; }
+    .dark .bg-blue-100 { background-color: #1a1a1a !important; }
+    .dark .border { border-color: #333 !important; }
+    .dark .hover\:bg-blue-50:hover { background-color: #222 !important; }
+    .dark button { color: #fff !important; border-color: #333 !important; }
+    .dark .bg-white.text-blue-700 { background-color: #333 !important; color: #fff !important; }
+
+    /* Spinner */
+    .spinner { width: 28px; height: 28px; border: 3px solid #93c5fd; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Toast centrado */
+    .toast {
+      position: fixed; left: 50%; top: 20%; transform: translate(-50%, -50%);
+      background: #111; color: #fff; padding: 10px 14px; border-radius: 10px; z-index: 60;
+      box-shadow: 0 8px 24px rgba(0,0,0,.25); opacity: 0; animation: fade 2.4s ease forwards;
+    }
+    .toast.warn { background:#b91c1c; } /* rojo para advertencias */
+    @keyframes fade { 5% {opacity:1} 85% {opacity:1} 100%{opacity:0} }
+
+    /* Evitar cortes de filas en PDF */
+    table { page-break-inside: auto; }
+    tr { page-break-inside: avoid; page-break-after: auto; }
+    thead { display: table-header-group; }
+    tfoot { display: table-footer-group; }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo } = React;
+    const API_BASE = "https://aaronbestplaces.vercel.app/api/lugares";
+
+    /* ======= Textos ======= */
+    const TEXTS = {
+      es: {
+        title:"Recomendaciones de Aarón",
+        menu_home:"🏠 Inicio", menu_reports:"📊 Reportes", menu_help:"❓ Ayuda", menu_access:"🌐 Accesibilidad", menu_about:"ℹ️ Acerca de",
+        city:"Ciudad", query:"Consulta", type:"Tipo de lugar", moreTypes:"Más categorías…", searchBtn:"Buscar lugares",
+        minRating:"Calificación mínima ⭐", minReviews:"Reseñas mínimas 💬", all:"Todas", applyFilters:"Aplicar filtros", clearFilters:"🧹 Limpiar todo",
+        results:"RESULTADOS", exportPDF:"📄 Exportar a PDF",
+        updating:"🔎 Consultando nuevos lugares en Google Maps…", filtersApplied:"✅ Filtros aplicados sobre los resultados actuales.",
+        dataUpdated:"✅ Datos actualizados correctamente", lastUpdate:"Última actualización",
+        noResults:"Sin resultados. Usa el buscador para traer datos de Google Maps.",
+        help_title:"Ayuda",
+        help_text:"1) En ‘Buscar lugares’, escribe el nombre o palabra (opcional: selecciona ‘Tipo de lugar’) y la ciudad; presiona ‘Buscar lugares’. 2) En ‘Filtros’, ajusta calificación y reseñas y presiona ‘Aplicar filtros’. 3) Exporta a PDF en el encabezado de resultados.",
+        close:"Cerrar", about_title:"Acerca de", about_line1:"Una aplicación para los mejores guías Edith y Aarón", about_line2:"De sus amigos Lili y Gus",
+        access_title:"Accesibilidad", access_select:"Selecciona el idioma", access_es:"Español", access_en:"English", access_fr:"Français", access_pt:"Português",
+        access_theme:"Modo oscuro", reports_title:"Reportes", reports_line1:"Próximamente habrá novedades en esta sección.", reports_line2:"¡Estamos trabajando para ofrecerte reportes y estadísticas personalizadas!",
+        info_title:"Detalles del lugar", info_rating:"Calificación", info_reviews:"Reseñas", info_price:"Precio", info_address:"Dirección", info_phone:"Teléfono", info_hours:"Horario", info_map:"Abrir en Google Maps",
+        footer_version:"Versión 50.7", expanded_prefix:"🔍 Búsqueda ampliada:", results_count:"lugares encontrados"
+      },
+      en: {
+        title:"Aaron’s Recommendations",
+        menu_home:"🏠 Home", menu_reports:"📊 Reports", menu_help:"❓ Help", menu_access:"🌐 Accessibility", menu_about:"ℹ️ About",
+        city:"City", query:"Query", type:"Place type", moreTypes:"More categories…", searchBtn:"Search places",
+        minRating:"Min rating ⭐", minReviews:"Min reviews 💬", all:"All", applyFilters:"Apply filters", clearFilters:"🧹 Clear all",
+        results:"RESULTS", exportPDF:"📄 Export to PDF",
+        updating:"🔎 Fetching new places from Google Maps…", filtersApplied:"✅ Filters applied to current results.",
+        dataUpdated:"✅ Data updated successfully", lastUpdate:"Last update",
+        noResults:"No results. Use the search to fetch data from Google Maps.",
+        help_title:"Help",
+        help_text:"1) In 'Search places', type a name or keyword (optional: select 'Place type') and the city; press 'Search places'. 2) In 'Filters', adjust rating and reviews and press 'Apply filters'. 3) Export to PDF at the results header.",
+        close:"Close", about_title:"About", about_line1:"An app for the best guides Edith and Aarón", about_line2:"From their friends Lili and Gus",
+        access_title:"Accessibility", access_select:"Select language", access_es:"Spanish", access_en:"English", access_fr:"French", access_pt:"Portuguese",
+        access_theme:"Dark mode", reports_title:"Reports", reports_line1:"New features coming soon to this section.", reports_line2:"We are working on personalized reports and statistics!",
+        info_title:"Place details", info_rating:"Rating", info_reviews:"Reviews", info_price:"Price", info_address:"Address", info_phone:"Phone", info_hours:"Hours", info_map:"Open in Google Maps",
+        footer_version:"Version 50.7", expanded_prefix:"🔍 Expanded search:", results_count:"places found"
+      },
+      fr: {}, pt: {}
+    };
+
+    /* ======= Equivalencias (comida + ocio + cultura) ======= */
+    const equivalencias = {
+      "taqueria":["tacos","taquería","taquerías","taqueros"],
+      "pizzeria":["pizza","pizzería","pizzerías","pizzeria","pizzerias"],
+      "hamburguesas":["hamburguesas","burger","hamburguesería","hamburgueserias"],
+      "sushi":["sushi","restaurante japonés","comida japonesa","ramen","izakaya","yakitori"],
+      "mariscos":["mariscos","pescados","marisquería","marisquerías"],
+      "cafe":["café","cafetería","coffee shop","cafés de especialidad","barista"],
+      "comida mexicana":["comida mexicana","antojitos","tacos","cocina mexicana"],
+      "comida italiana":["comida italiana","trattoria","pasta","pizza"],
+      "comida china":["comida china","chow mein","arroz frito","dim sum"],
+      "comida americana":["comida americana","hamburguesas","bbq","alitas","hot dogs"],
+      "comida india":["comida india","curry","masala","tandoori","hindú"],
+      "comida vegana":["vegano","vegana","vegetariano","vegetariana","plant based","plant-based","saludable"],
+      "postres":["postres","repostería","pastelería","dulces"],
+      "bares":["bar","cantina","cervecería","pub","mixología","coctelería"],
+      "antros":["antro","discoteca","club nocturno","nightclub","dance club","disco"],
+      "discos":["disco","discoteca","club","fiesta","dance floor"],
+      "museos":["museo","galería","galeria","exposición","exhibición","arte"]
+    };
+
+    /* ======= Listas para prefijos adaptativos ======= */
+    const GENERIC_FOOD = [
+      "tacos","taqueria","taquería","taquerías","taqueros","pizza","pizzeria","pizzería","pizzerías",
+      "hamburguesas","sushi","mariscos","cafe","cafeteria","cafetería","antojitos","restaurantes","carnes",
+      "postres","panaderia","panadería","vegano","vegetariano","pasta","italiana","china","india","americana","mexicana","ramen","bbq","alitas","hot dogs"
+    ];
+    const GENERIC_LEISURE = [
+      "bares","bar","cantina","cerveceria","cervecería","pub","pubs","antros","antro","discoteca","discotecas","discos","club","club nocturno","nightclub",
+      "museos","museo","galeria","galería","cine","teatro","exposición","exhibición","arte"
+    ];
+
+    /* ======= Utilidades ======= */
+    const normalize = (s)=> (s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim();
+    const looksGeneric = (term) => /^[a-záéíóúñ\s]+$/.test(term.trim());
+    const priceToSymbol = (lvl) => { const n = Number(lvl); return n===1 ? "$" : n===2 ? "$$" : n===3 ? "$$$" : n===4 ? "$$$$" : "—"; };
+
+    function expandQueryTerms(raw){
+      const base=normalize(raw||""); if(!base) return [];
+      const set=new Set([base, ...base.split(/\s+/)]);
+      const groups=Object.entries(equivalencias).map(([k,a])=>[normalize(k),...a.map(normalize)]);
+      let changed=true, i=0;
+      while(changed && i<2){changed=false; i++;
+        for(const t of Array.from(set)){
+          for(const g of groups){
+            if(g.some(x=>t.includes(x) || x.includes(t))){
+              for(const w of g){ if(!set.has(w)){ set.add(w); changed=true; } }
+            }
+          }
+        }
+      }
+      return Array.from(set);
+    }
+
+    // 🔎 Detección de nombre propio (para no usar sinónimos ni prefijos)
+    function isLikelyProperName(raw){
+      const str = (raw||"").trim();
+      if(!str) return false;
+      const hasCaps = /[A-ZÁÉÍÓÚÑ]/.test(raw);
+      const hasQuotes = /["'’]/.test(raw);
+      const words = str.split(/\s+/);
+      const normWords = words.map(normalize);
+      const inGeneric = normWords.some(w => GENERIC_FOOD.includes(w) || GENERIC_LEISURE.includes(w));
+      const twoWordsNotGeneric = words.length >= 2 && !inGeneric;
+      return hasCaps || hasQuotes || twoWordsNotGeneric;
+    }
+
+    // Mapa de palabras clave por type para “solo tipo”
+    const TYPE_TO_KEYWORD = {
+      lodging: "hoteles", restaurant: "restaurantes", cafe: "cafeterías", bar: "bares",
+      night_club: "antros", gym: "gimnasios", museum: "museos", art_gallery: "galerías de arte",
+      tourist_attraction: "atracciones turísticas", shopping_mall: "centros comerciales",
+      bakery: "panaderías", meal_takeaway: "comida para llevar", meal_delivery: "comida a domicilio",
+      park: "parques", store: "tiendas", supermarket: "supermercados", gas_station: "gasolineras",
+      pharmacy: "farmacias", hospital: "hospitales", church: "iglesias", bank: "bancos", atm: "cajeros",
+      car_repair: "talleres mecánicos", car_rental: "renta de autos", airport: "aeropuertos",
+      bus_station: "terminales de autobuses", train_station: "estaciones de tren",
+      electronics_store: "tiendas de electrónica", movie_theater: "cines"
+    };
+
+    // 🖼️ Logo para header (archivo local)
+    const HEADER_LOGO_SRC = "logo.png";
+
+    // 🧪 Genera un logo PNG en tiempo real (para PDF) sin depender de archivos externos
+    function buildPdfLogoDataURL() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 900;  // alta resolución para impresión
+      canvas.height = 140;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#ffffff"; ctx.fillRect(0,0,canvas.width,canvas.height);
+      ctx.fillStyle = "#000000";
+      ctx.font = "bold 52px Arial, Helvetica, sans-serif";
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText("Recomendaciones de Aarón", canvas.width/2, canvas.height/2);
+      return canvas.toDataURL("image/png");
+    }
+
+    const PLACEHOLDER_IMG = "data:image/svg+xml;utf8,"+encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><rect width='100%' height='100%' fill='#e5e7eb'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' font-family='Arial' font-size='18' fill='#6b7280'>🏙️</text></svg>`);
+
+    function App(){
+      const [lang,setLang]=useState("es"); // Español por defecto
+      const [dark,setDark]=useState(false);
+      const [openMenu,setOpenMenu]=useState(false);
+      const [openHelp,setOpenHelp]=useState(false);
+      const [openAbout,setOpenAbout]=useState(false);
+      const [openReports,setOpenReports]=useState(false);
+      const [openAccess,setOpenAccess]=useState(false);
+      const [infoRow,setInfoRow]=useState(null);
+
+      // ====== Estados de Búsqueda (Bloque A)
+      const [city,setCity]=useState("Ciudad de México");
+      const [query,setQuery]=useState("");
+      const [placeType,setPlaceType]=useState(""); // selector de tipo
+      const [showMoreTypes,setShowMoreTypes]=useState(false);
+
+      // ====== Estados de Filtros Locales (Bloque B)
+      const [rows,setRows]=useState([]);
+      const [tempMinRating,setTempMinRating]=useState("");
+      const [tempMinReviews,setTempMinReviews]=useState("");
+      const [minRating,setMinRating]=useState("");     // aplicados
+      const [minReviews,setMinReviews]=useState("");   // aplicados
+
+      const [loading,setLoading]=useState(false);
+      const [message,setMessage]=useState("");
+      const [toast,setToast]=useState("");
+      const [lastUpdate,setLastUpdate]=useState("");
+      const [expandedNotice,setExpandedNotice]=useState("");
+      const [debugUrl,setDebugUrl]=useState("");
+
+      // Traducciones
+      const t = (k)=> (TEXTS[lang] && TEXTS[lang][k]) ? TEXTS[lang][k] : TEXTS["es"][k] || k;
+
+      // Dark mode persistente
+      useEffect(()=>{ const saved=localStorage.getItem("aaron_dark")==="1"; setDark(saved); document.documentElement.classList.toggle("dark",saved); },[]);
+      useEffect(()=>{ localStorage.setItem("aaron_dark",dark?"1":"0"); document.documentElement.classList.toggle("dark",dark); },[dark]);
+      useEffect(()=>{ document.title=t("title"); },[lang]);
+
+      // Bloqueo scroll con modales
+      useEffect(()=>{
+        const anyOpen=openMenu||openHelp||openAbout||openReports||openAccess||!!infoRow;
+        document.body.style.overflow= anyOpen ? "hidden":"auto";
+        return ()=>{ document.body.style.overflow="auto"; };
+      },[openMenu,openHelp,openAbout,openReports,openAccess,infoRow]);
+
+      const formatMiles=(n)=> (n??0).toLocaleString(lang==="es"?"es-MX":lang==="pt"?"pt-BR":lang==="fr"?"fr-FR":"en-US");
+
+      // Toast helper
+      const showToast = (text, isWarn=false) => {
+        setToast({ text, warn: isWarn, ts: Date.now() });
+        setTimeout(()=> setToast(""), 2400);
+      };
+
+      /* ======= Búsqueda ampliada + reglas de “solo tipo” y “nombre propio” ======= */
+      async function fetchPlaces(q) {
+        if(!q.trim() && !placeType){
+          showToast("⚠️ Escribe una consulta o selecciona un tipo de lugar.", true);
+          return;
+        }
+
+        setLoading(true);
+        setMessage(t("updating"));
+        try {
+          const rawText = (q||"");
+          const baseText = rawText.trim();
+          const noText = baseText.length===0;
+
+          let queriesToRun = [];
+          let showExpanded = false;
+
+          if (noText && placeType) {
+            const keyword = TYPE_TO_KEYWORD[placeType] || "";
+            const textQuery = keyword ? `${keyword} en ${city}` : city;
+            queriesToRun = [textQuery];
+          } else if (isLikelyProperName(rawText)) {
+            const textQuery = `${rawText} en ${city}`;
+            queriesToRun = [textQuery];
+          } else {
+            const terms = expandQueryTerms(baseText || ((lang==="es"||lang==="pt")?"restaurantes":"restaurants"));
+            const visible = terms.filter(Boolean).slice(0, 12);
+            showExpanded = visible.length > 1;
+            queriesToRun = visible.length ? visible.map(t => {
+              const term = t;
+              const inFood = GENERIC_FOOD.some(w => t.includes(normalize(w)));
+              const inLeisure = GENERIC_LEISURE.some(w => t.includes(normalize(w)));
+              const genericByPattern = looksGeneric(t);
+              if ((inFood || genericByPattern) && !inLeisure) return `restaurantes de ${term} en ${city}`;
+              if (inLeisure && !inFood) return `lugares de ${term} en ${city}`;
+              return `${term} en ${city}`;
+            }) : [`${baseText} en ${city}`];
+          }
+
+          if (showExpanded) {
+            setExpandedNotice(`${t("expanded_prefix")} ${queriesToRun.map(x=>x.split(" en ")[0]).slice(0,8).join(", ")}`);
+            setTimeout(() => setExpandedNotice(""), 3000);
+          } else {
+            setExpandedNotice("");
+          }
+
+          const seen = new Map();
+
+          for (const textQuery of queriesToRun) {
+            const url = API_BASE + "?q=" + encodeURIComponent(textQuery) + (placeType ? "&type="+encodeURIComponent(placeType) : "");
+            console.log("🔍 URL generada:", url);
+            setDebugUrl(url);
+            setMessage("📡 Consultando: " + url);
+
+            const res = await fetch(url);
+            const json = await res.json();
+            const arr = (json.results || []).map((p, i) => ({
+              id: p.place_id || `${textQuery}_${i}`,
+              nombre: p.name || "-",
+              calificacion: p.rating ?? "-",
+              reseñas: p.user_ratings_total ?? 0,
+              precio: p.price_level ?? null,
+              direccion: p.formatted_address || p.vicinity || "-",
+              lugarId: p.place_id || null,
+              telefono: p.formatted_phone_number || null,
+              horario: (p.opening_hours && p.opening_hours.weekday_text)
+                ? p.opening_hours.weekday_text.join(" · ")
+                : (p.opening_hours && typeof p.opening_hours.open_now==="boolean")
+                    ? (p.opening_hours.open_now ? "Abierto ahora" : "Cerrado")
+                    : null,
+              url: p.url || null,
+              tipos: p.types || [],
+              icono: p.icon || null
+            }));
+
+            for (const place of arr) {
+              const key = (normalize(place.nombre || "-")) + "|" + (normalize(place.direccion || "-"));
+              if (!seen.has(key)) {
+                seen.set(key, place);
+              } else {
+                const prev = seen.get(key);
+                if ((Number(place.calificacion)||0) > (Number(prev.calificacion)||0)) prev.calificacion = place.calificacion;
+                if ((place.reseñas||0) > (prev.reseñas||0)) prev.reseñas = place.reseñas;
+                if (prev.precio == null && place.precio != null) prev.precio = place.precio;
+                if (!prev.icono && place.icono) prev.icono = place.icono;
+                seen.set(key, prev);
+              }
+            }
+          }
+
+          const data = Array.from(seen.values()).sort(
+            (a, b) => (Number(b.calificacion) || 0) - (Number(a.calificacion) || 0)
+          );
+
+          setRows(data);
+          setMessage(t("dataUpdated"));
+
+          const now = new Date();
+          const fecha = now.toLocaleDateString("es-MX");
+          const hora = now.toLocaleTimeString("es-MX",{ hour: '2-digit', minute: '2-digit' });
+          setLastUpdate(`${fecha} ${hora}`);
+        } catch (e) {
+          console.error(e);
+          setMessage("❌ Error al consultar la API");
+          showToast("❌ Error al consultar la API", true);
+        } finally {
+          setLoading(false);
+          // Ocultar depuración tras 5s
+          setTimeout(()=> setDebugUrl(""), 5000);
+        }
+      }
+
+      /* ======= FILTRO aplicado SOLO al presionar 'Aplicar filtros' ======= */
+      const rowsFiltered = useMemo(()=>{
+        const terms = query && !isLikelyProperName(query) ? expandQueryTerms(query) : [];
+        return rows.filter(r=>{
+          const name=normalize(r.nombre||"");
+          const addr=normalize(r.direccion||"");
+          const passName = terms.length ? terms.some(t => name.includes(t) || addr.includes(t)) : true;
+          const passRating = minRating ? (Number(r.calificacion)>=Number(minRating)) : true;
+          const passReviews = minReviews ? (Number(r.reseñas) >= Number(minReviews)) : true;
+          return passName && passRating && passReviews;
+        });
+      },[rows,query,minRating,minReviews]);
+
+      // 🧾 PDF sin cortes — genera documento desde rowsFiltered (solo lo visible)
+      const exportPDF = () => {
+        const darkMode = document.documentElement.classList.contains("dark");
+        const wrapper = document.createElement("div");
+        wrapper.style.padding = "10px";
+        wrapper.style.fontFamily = "Arial, sans-serif";
+        wrapper.style.color = darkMode ? "#fff" : "#000";
+        wrapper.style.backgroundColor = darkMode ? "#000" : "#fff";
+
+        // Header
+        const header = document.createElement("div");
+        header.style.display = "flex";
+        header.style.flexDirection = "column";
+        header.style.alignItems = "center";
+        header.style.gap = "8px";
+        header.style.marginBottom = "10px";
+
+        const img = document.createElement("img");
+        img.src = buildPdfLogoDataURL();
+        img.style.height = "46px"; img.style.width = "auto";
+
+        const filters = document.createElement("div");
+        filters.style.fontSize = "12px";
+        filters.style.opacity = "0.85";
+        const r = minRating ? `${minRating}+`:"—";
+        const rv = minReviews ? `${Number(minReviews).toLocaleString("es-MX")}+`:"—";
+        const typeSel = placeType ? (TYPE_TO_KEYWORD[placeType] || placeType) : (TEXTS[lang].all || "Todas");
+        filters.textContent = `Ciudad: ${city}  |  Calificación: ${r}  |  Reseñas: ${rv}  |  Tipo: ${typeSel}`;
+
+        header.appendChild(img);
+        header.appendChild(filters);
+        wrapper.appendChild(header);
+
+        // Tabla construida manualmente (solo rowsFiltered)
+        const table = document.createElement("table");
+        table.style.width = "100%";
+        table.style.borderCollapse = "collapse";
+        table.style.fontSize = "12px";
+
+        const thead = document.createElement("thead");
+        const trh = document.createElement("tr");
+        const ths = ["#", "Lugar", "Calificación", "Precio", "Reseñas", "Dirección", "Ver mapa"];
+        ths.forEach(txt => {
+          const th = document.createElement("th");
+          th.textContent = txt;
+          th.style.border = "1px solid " + (darkMode ? "#333" : "#ccc");
+          th.style.backgroundColor = darkMode ? "#1a1a1a" : "#eef2ff";
+          th.style.color = darkMode ? "#fff" : "#111";
+          th.style.padding = "6px";
+          trh.appendChild(th);
+        });
+        thead.appendChild(trh);
+        table.appendChild(thead);
+
+        const tbody = document.createElement("tbody");
+        rowsFiltered.forEach((r, idx) => {
+          const tr = document.createElement("tr");
+          const cells = [
+            String(idx+1),
+            r.nombre || "—",
+            (r.calificacion ?? "—"),
+            ( (n => n===1?"$":n===2?"$$":n===3?"$$$":n===4?"$$$$":"—")(Number(r.precio)) ),
+            ( (r.reseñas??0).toLocaleString("es-MX") ),
+            r.direccion || "—",
+            "Abrir"
+          ];
+          cells.forEach((val, i) => {
+            const td = document.createElement("td");
+            td.textContent = val;
+            td.style.border = "1px solid " + (darkMode ? "#333" : "#ddd");
+            td.style.padding = "6px";
+            if(i===2 || i===3 || i===4) td.style.textAlign = "center";
+            if(i===6){
+              td.textContent = "";
+              const a = document.createElement("a");
+              a.href = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent((r.nombre||"")+" "+(r.direccion||""));
+              a.textContent = "Abrir";
+              a.style.color = "#2563eb";
+              td.appendChild(a);
+              td.style.textAlign = "center";
+            }
+            tr.appendChild(td);
+          });
+          tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        wrapper.appendChild(table);
+
+        // Pie alineado a la derecha
+        const footer = document.createElement("div");
+        footer.style.fontSize = "10px";
+        footer.style.opacity = "0.8";
+        footer.style.textAlign = "right";
+        footer.style.marginTop = "8px";
+        footer.textContent = "Generado con Recomendaciones de Aarón v50.7";
+        wrapper.appendChild(footer);
+
+        document.body.appendChild(wrapper);
+
+        const now = new Date();
+        const fecha = now.toLocaleDateString("es-MX");
+        const hora = now.toLocaleTimeString("es-MX",{hour:'2-digit',minute:'2-digit'});
+        const filename = `reporte_recomendaciones_${fecha}_${hora.replace(':','-')}.pdf`;
+
+        html2pdf().set({
+          margin: 10,
+          filename,
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: {
+            scale: 3,
+            useCORS: true,
+            allowTaint: true,
+            backgroundColor: darkMode ? "#000000" : "#ffffff",
+            windowWidth: wrapper.scrollWidth
+          },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+          pagebreak: { mode: ['css','legacy','avoid-all'] }
+        })
+        .from(wrapper)
+        .save()
+        .then(()=> {
+          console.log("✅ Exportación PDF completada correctamente");
+          document.body.removeChild(wrapper);
+        })
+        .catch(()=> { document.body.removeChild(wrapper); });
+      };
+
+      const applyFilters = ()=>{
+        setMinRating(tempMinRating);
+        setMinReviews(tempMinReviews);
+        setMessage(t("filtersApplied"));
+        setTimeout(()=>setMessage(""), 2500);
+      };
+
+      const clearAll = ()=>{
+        setQuery(""); setPlaceType(""); setRows([]);
+        setTempMinRating(""); setTempMinReviews("");
+        setMinRating(""); setMinReviews("");
+        setMessage(""); setExpandedNotice(""); setLastUpdate("");
+        showToast("Limpieza completa ✔️");
+      };
+
+      const resetHome=()=>{
+        setOpenMenu(false);
+        clearAll();
+        setCity("Ciudad de México");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      };
+
+      // Forzar rerender general cuando cambia idioma (key en raíz)
+      const [langKey, setLangKey] = useState(0);
+      useEffect(()=>{ setLangKey(x => x + 1); }, [lang]);
+
+      return (
+        <div className="min-h-screen" key={langKey}>
+          {/* Header */}
+          <header className="bg-blue-600 text-white px-4 py-3 shadow-md flex items-center gap-3">
+            <button onClick={()=>setOpenMenu(true)} className="text-2xl hover:opacity-80" aria-label="Abrir menú">☰</button>
+            <img src={HEADER_LOGO_SRC} alt="Logo" className="h-12 w-auto" />
+            <h1 className="text-xl font-bold">{t("title")}</h1>
+            <div className="ml-auto">
+              <button onClick={()=>setDark(!dark)} className="text-white text-xl" title={t("access_theme")}>🌓</button>
+            </div>
+          </header>
+
+          {/* Backdrop Menú */}
+          {openMenu && <div className="fixed inset-0 bg-black/40 z-40" onClick={()=>setOpenMenu(false)}></div>}
+
+          {/* Menú lateral */}
+          <aside className={"fixed top-0 left-0 z-50 bg-white w-64 h-full shadow-xl menu-panel "+(openMenu?"open":"")}>
+            <div className="p-4 border-b flex items-center justify-between">
+              <span className="font-semibold">Menú</span>
+              <button onClick={()=>setOpenMenu(false)} className="text-lg" aria-label="Cerrar">✕</button>
+            </div>
+            <nav className="p-4 space-y-3 text-gray-700">
+              <div className="hover:underline cursor-pointer" onClick={resetHome}>{t("menu_home")}</div>
+              <div className="hover:underline cursor-pointer" onClick={()=>{setOpenReports(true); setOpenMenu(false);}}>{t("menu_reports")}</div>
+              <div className="hover:underline cursor-pointer" onClick={()=>{setOpenHelp(true); setOpenMenu(false);}}>{t("menu_help")}</div>
+              <div className="hover:underline cursor-pointer" onClick={()=>{setOpenAccess(true); setOpenMenu(false);}}>{t("menu_access")}</div>
+              <div className="hover:underline cursor-pointer" onClick={()=>{setOpenAbout(true); setOpenMenu(false);}}>{t("menu_about")}</div>
+            </nav>
+          </aside>
+
+          {/* 🔵 BLOQUE A — BÚSQUEDA PRINCIPAL */}
+          <section className="max-w-6xl mx-auto mt-6 px-4">
+            <div className="bg-white rounded-xl shadow p-4 space-y-4">
+              <h2 className="text-lg font-semibold text-blue-700">🔍 {t("searchBtn")}</h2>
+              <div className="flex flex-col md:flex-row gap-3 items-start md:items-end">
+                <div className="w-full md:w-1/4">
+                  <label className="block text-sm text-gray-600 mb-1">{t("city")}</label>
+                  <select value={city} onChange={(e)=>setCity(e.target.value)} className="border rounded-lg p-2 w-full shadow-sm">
+                    <option>Ciudad de México</option>
+                    <option>Guadalajara</option>
+                    <option>Monterrey</option>
+                  </select>
+                </div>
+
+                <div className="flex-1 w-full">
+                  <label className="block text-sm text-gray-600 mb-1">{t("query")}</label>
+                  <input
+                    type="text"
+                    value={query}
+                    onChange={(e)=>setQuery(e.target.value)}
+                    onKeyDown={(e)=>{ if(e.key==="Enter") fetchPlaces(query); }}
+                    placeholder="Ej. 'Casa de Toño', 'taquerías', 'museos', 'pizza'…"
+                    className="border rounded-lg p-2 w-full shadow-sm"
+                  />
+                </div>
+
+                <div className="w-full md:w-64">
+                  <label className="block text-sm text-gray-600 mb-1">{t("type")}</label>
+                  <select value={placeType} onChange={(e)=>setPlaceType(e.target.value)} className="border rounded-lg p-2 w-full shadow-sm">
+                    <option value="">{t("all")}</option>
+                    <option value="restaurant">🍽️ Restaurante</option>
+                    <option value="cafe">☕ Cafetería</option>
+                    <option value="bar">🍺 Bar / Cantina</option>
+                    <option value="night_club">🍸 Antro / Club</option>
+                    <option value="bakery">🥐 Panadería</option>
+                    <option value="meal_takeaway">🍱 Comida para llevar</option>
+                    <option value="meal_delivery">🍕 Comida a domicilio</option>
+                    <option value="museum">🏛️ Museo</option>
+                    <option value="art_gallery">🎨 Galería de arte</option>
+                    <option value="tourist_attraction">🏞️ Atracción turística</option>
+                    <option value="lodging">🏨 Hotel / Hospedaje</option>
+                    <option value="shopping_mall">🛍️ Centro comercial</option>
+                    <option value="gym">💪 Gimnasio</option>
+                    <option value="beauty_salon">💇‍♀️ Salón de belleza</option>
+                    <option value="movie_theater">🎭 Cine / Teatro</option>
+                  </select>
+
+                  {/* Más categorías */}
+                  <button className="text-blue-600 underline mt-2" onClick={()=>setShowMoreTypes(!showMoreTypes)}>{t("moreTypes")}</button>
+                  {showMoreTypes && (
+                    <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
+                      <button className="border rounded p-1 hover:bg-gray-50" onClick={()=>setPlaceType("park")}>🏞️ Parque</button>
+                      <button className="border rounded p-1 hover:bg-gray-50" onClick={()=>setPlaceType("store")}>🏪 Tienda</button>
+                      <button className="border rounded p-1 hover:bg-gray-50" onClick={()=>setPlaceType("gas_station")}>⛽ Gasolinera</button>
+                      <button className="border rounded p-1 hover:bg-gray-50" onClick={()=>setPlaceType("pharmacy")}>💊 Farmacia</button>
+                      <button className="border rounded p-1 hover:bg-gray-50" onClick={()=>setPlaceType("hospital")}>🏥 Hospital</button>
+                      <button className="border rounded p-1 hover:bg-gray-50" onClick={()=>setPlaceType("church")}>⛪ Iglesia</button>
+                      <button className="border rounded p-1 hover:bg-gray-50" onClick={()=>setPlaceType("bank")}>🏦 Banco</button>
+                      <button className="border rounded p-1 hover:bg-gray-50" onClick={()=>setPlaceType("atm")}>🏧 Cajero</button>
+                      <button className="border rounded p-1 hover:bg-gray-50" onClick={()=>setPlaceType("car_repair")}>🔧 Taller mecánico</button>
+                      <button className="border rounded p-1 hover:bg-gray-50" onClick={()=>setPlaceType("car_rental")}>🚙 Renta de autos</button>
+                      <button className="border rounded p-1 hover:bg-gray-50" onClick={()=>setPlaceType("airport")}>✈️ Aeropuerto</button>
+                      <button className="border rounded p-1 hover:bg-gray-50" onClick={()=>setPlaceType("bus_station")}>🚌 Terminal</button>
+                      <button className="border rounded p-1 hover:bg-gray-50" onClick={()=>setPlaceType("train_station")}>🚆 Estación</button>
+                      <button className="border rounded p-1 hover:bg-gray-50" onClick={()=>setPlaceType("electronics_store")}>💻 Electrónica</button>
+                      <button className="border rounded p-1 hover:bg-gray-50" onClick={()=>setPlaceType("supermarket")}>🛒 Supermercado</button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <button onClick={()=>fetchPlaces(query)} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">{t("searchBtn")}</button>
+                  {loading && <div className="spinner" aria-label="Cargando"></div>}
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* 🟤 BLOQUE B — Filtros (locales) */}
+          <section className="max-w-6xl mx-auto mt-4 px-4">
+            <div className="bg-white rounded-xl shadow p-4 space-y-3">
+              <h2 className="text-lg font-semibold text-gray-700">🧩 Filtros (sobre resultados actuales)</h2>
+              <div className="flex flex-col md:flex-row gap-3 items-end">
+                <div className="w-full md:w-56">
+                  <label className="block text-sm text-gray-600 mb-1">{t("minRating")}</label>
+                  <select value={tempMinRating} onChange={(e)=>setTempMinRating(e.target.value)} className="border rounded-lg p-2 w-full shadow-sm">
+                    <option value="">{t("all")}</option>
+                    <option value="4.0">4.0+</option>
+                    <option value="4.2">4.2+</option>
+                    <option value="4.4">4.4+</option>
+                    <option value="4.6">4.6+</option>
+                    <option value="4.8">4.8+</option>
+                  </select>
+                </div>
+                <div className="w-full md:w-56">
+                  <label className="block text-sm text-gray-600 mb-1">{t("minReviews")}</label>
+                  <select value={tempMinReviews} onChange={(e)=>setTempMinReviews(e.target.value)} className="border rounded-lg p-2 w-full shadow-sm">
+                    <option value="">{t("all")}</option>
+                    <option value="1000">1,000+</option>
+                    <option value="5000">5,000+</option>
+                    <option value="10000">10,000+</option>
+                    <option value="15000">15,000+</option>
+                    <option value="20000">20,000+</option>
+                    <option value="25000">25,000+</option>
+                    <option value="30000">30,000+</option>
+                  </select>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={applyFilters} className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100">{t("applyFilters")}</button>
+                  <button onClick={clearAll} className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100">{t("clearFilters")}</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Mensajes arriba de la tabla (incluye depuración) */}
+          <section className="max-w-6xl mx-auto px-4 mt-3">
+            {!loading && message && <div className="text-green-700 bg-green-50 border border-green-200 rounded p-2 text-sm">{message}</div>}
+            {debugUrl && (
+              <div className="text-xs mt-2 text-gray-600 bg-gray-100 border rounded p-2 overflow-x-auto">
+                <strong>🔍 URL enviada:</strong> {debugUrl}
+              </div>
+            )}
+          </section>
+
+          {/* Resultados */}
+          <section id="results-section" className="max-w-6xl mx-auto mt-3 px-4">
+            <div className="bg-white rounded-xl shadow overflow-hidden">
+              <div className="bg-blue-600 text-white px-4 py-3 font-semibold flex justify-between items-center">
+                <span>{t("results")}</span>
+                <button onClick={exportPDF} className="bg-white text-blue-700 font-semibold px-3 py-1 rounded hover:bg-blue-50 text-sm">{t("exportPDF")}</button>
+              </div>
+
+              {expandedNotice && (
+                <div className="px-4 py-2 bg-blue-100 text-blue-800 border-t border-b border-blue-200 text-sm">
+                  {expandedNotice}
+                </div>
+              )}
+
+              {/* Contador de resultados */}
+              <div className="px-4 pt-3 text-sm text-gray-600">
+                📊 {rowsFiltered.length.toLocaleString("es-MX")} {t("results_count")}
+              </div>
+
+              <div className="p-4 overflow-x-auto">
+                <table className="min-w-full text-sm border">
+                  <thead className="bg-blue-100">
+                    <tr>
+                      <th className="border p-2 text-center">#</th>
+                      <th className="border p-2 text-left">🏠 Lugar</th>
+                      <th className="border p-2 text-center">⭐ Calificación</th>
+                      <th className="border p-2 text-center">💲 Precio</th>
+                      <th className="border p-2 text-center">💬 Reseñas</th>
+                      <th className="border p-2 text-left">📍 Dirección</th>
+                      <th className="border p-2 text-center">🔗 Ver mapa</th>
+                      <th className="border p-2 text-center">ℹ️</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rowsFiltered.map((r, idx)=>(
+                      <tr key={idx} className="hover:bg-blue-50 transition-all">
+                        <td className="border p-2 text-center">{idx+1}</td>
+                        <td className="border p-2">
+                          <div className="flex items-center gap-2">
+                            <img src={r.icono || PLACEHOLDER_IMG} alt="" className="w-6 h-6 rounded-sm object-contain bg-white border" />
+                            <span className="font-medium">{r.nombre}</span>
+                          </div>
+                        </td>
+                        <td className="border p-2 text-center">{r.calificacion}</td>
+                        <td className="border p-2 text-center">{priceToSymbol(r.precio)}</td>
+                        <td className="border p-2 text-center">{formatMiles(r.reseñas)}</td>
+                        <td className="border p-2">{r.direccion}</td>
+                        <td className="border p-2 text-center">
+                          <a href={"https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent((r.nombre||"")+" "+(r.direccion||""))}
+                             target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                            Abrir
+                          </a>
+                        </td>
+                        <td className="border p-2 text-center">
+                          <button className="underline text-blue-600 hover:opacity-80" onClick={()=>setInfoRow(r)}>ℹ️</button>
+                        </td>
+                      </tr>
+                    ))}
+                    {rowsFiltered.length===0 && (
+                      <tr>
+                        <td colSpan="8" className="text-center text-gray-500 p-6">{t("noResults")}</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="flex flex-col items-center justify-center mt-6 mb-10">
+              {lastUpdate && (
+                <p className="text-gray-500 text-sm mt-1">{t("lastUpdate")}: {lastUpdate}</p>
+              )}
+            </div>
+          </section>
+
+          {/* Modales */}
+          {openHelp && (
+            <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+              <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 text-center">
+                <h2 className="text-xl font-semibold mb-3 text-blue-600">{t("help_title")}</h2>
+                <p className="text-sm text-gray-700 mb-4">{t("help_text")}</p>
+                <button onClick={()=>setOpenHelp(false)} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">{t("close")}</button>
+              </div>
+            </div>
+          )}
+
+          {openAbout && (
+            <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+              <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 text-center">
+                <h2 className="text-xl font-semibold mb-3 text-blue-600">{t("about_title")}</h2>
+                <p className="text-gray-700 mb-4">{t("about_line1")}<br/>{t("about_line2")}</p>
+                <button onClick={()=>setOpenAbout(false)} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">{t("close")}</button>
+              </div>
+            </div>
+          )}
+
+          {openReports && (
+            <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+              <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 text-center">
+                <h2 className="text-xl font-semibold mb-3 text-blue-600">{t("reports_title")}</h2>
+                <p className="text-gray-700 mb-1">{t("reports_line1")}</p>
+                <p className="text-gray-700 mb-4">{t("reports_line2")}</p>
+                <button onClick={()=>setOpenReports(false)} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">{t("close")}</button>
+              </div>
+            </div>
+          )}
+
+          {openAccess && (
+            <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+              <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 text-center">
+                <h2 className="text-xl font-semibold mb-3 text-blue-600">{t("access_title")}</h2>
+                <p className="text-sm text-gray-700 mb-4">{t("access_select")}</p>
+
+                <div className="flex items-center justify-center gap-4 mb-4">
+                  <label className="inline-flex items-center gap-2"><input type="radio" name="lang1" checked={lang==="es"} onChange={()=>setLang("es")}/><span>{TEXTS.es.access_es}</span></label>
+                  <label className="inline-flex items-center gap-2"><input type="radio" name="lang1" checked={lang==="en"} onChange={()=>setLang("en")}/><span>English</span></label>
+                </div>
+                <div className="flex items-center justify-center gap-4 mb-6">
+                  <label className="inline-flex items-center gap-2"><input type="radio" name="lang2" checked={lang==="fr"} onChange={()=>setLang("fr")}/><span>Français</span></label>
+                  <label className="inline-flex items-center gap-2"><input type="radio" name="lang2" checked={lang==="pt"} onChange={()=>setLang("pt")}/><span>Português</span></label>
+                </div>
+
+                <div className="flex items-center justify-center gap-3 mb-6">
+                  <input id="darkmode" type="checkbox" checked={dark} onChange={()=>setDark(!dark)} />
+                  <label htmlFor="darkmode">{t("access_theme")}</label>
+                </div>
+
+                <button onClick={()=>setOpenAccess(false)} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">{t("close")}</button>
+              </div>
+            </div>
+          )}
+
+          {/* Modal ℹ️ */}
+          {infoRow && (
+            <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+              <div className="bg-white rounded-xl shadow-xl max-w-lg w-full p-6">
+                <h3 className="text-lg font-semibold text-blue-600 mb-2">{t("info_title")}</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                  <div><b>🏠 Nombre:</b> {infoRow.nombre}</div>
+                  <div><b>⭐ {t("info_rating")}:</b> {infoRow.calificacion || "—"}</div>
+                  <div className="sm:col-span-2"><b>📍 {t("info_address")}:</b> {infoRow.direccion || "—"}</div>
+                  <div><b>💲 {t("info_price")}:</b> {priceToSymbol(infoRow.precio)}</div>
+                  <div><b>📞 {t("info_phone")}:</b> {infoRow.telefono || "—"}</div>
+                  <div className="sm:col-span-2"><b>⏰ {t("info_hours")}:</b> {infoRow.horario || "—"}</div>
+                  <div className="sm:col-span-2">
+                    <a className="text-blue-600 underline"
+                      href={"https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent((infoRow.nombre||"")+" "+(infoRow.direccion||""))}
+                      target="_blank" rel="noopener noreferrer">🔗 {t("info_map")}
+                    </a>
+                  </div>
+                </div>
+                <div className="mt-4 text-right">
+                  <button onClick={()=>setInfoRow(null)} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">{t("close")}</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Toast centrado */}
+          {toast && toast.text && (
+            <div className={"toast "+(toast.warn?"warn":"")}>{toast.text}</div>
+          )}
+
+          {/* Footer */}
+          <footer className="mt-10 p-4 text-center text-gray-500 text-sm flex flex-col md:flex-row justify-between items-center border-t border-gray-200">
+            <span>© 2025 {t("title")} — Todos los derechos reservados.</span>
+            <span className="text-right font-semibold text-gray-600">{t("footer_version")}</span>
+          </footer>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
